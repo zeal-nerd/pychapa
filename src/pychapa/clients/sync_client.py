@@ -17,20 +17,21 @@ logger = logging.getLogger("pychapa")
 class Chapa:
     """
     Synchronous client for interacting with the Chapa payment API.
-    
+
     This client provides methods for payment processing, transfers, subaccounts,
     and other Chapa API functionality using synchronous HTTP requests.
     """
-    
+
     def __init__(self, token: str, base_url: str = "https://api.chapa.co/v1") -> None:
         """
         Initialize the Chapa client.
-        
+
         Args:
             token (str): Your Chapa API token for authentication
-            base_url (str, optional): The base URL for the Chapa API. 
+            base_url (str, optional): The base URL for the Chapa API.
                 Defaults to "https://api.chapa.co/v1"
         """
+        logger.info("Initializing Chapa client with base URL: %s", base_url)
         self.__token__ = token
         self.__base_url__ = base_url
         self.__client__ = httpx.Client()
@@ -39,27 +40,31 @@ class Chapa:
             "Authorization": f"Bearer {self.__token__}",
             "Content-Type": "application/json",
         }
+        logger.debug("Chapa client initialized successfully")
 
     def _send_request(
         self, method: HttpMethod, path: str, *args, **kwargs
     ) -> httpx.Response:
         """
         Send all requests from a single point with authorization keys.
-        
+
         Args:
             method (HttpMethod): The HTTP method to use
             path (str): The API endpoint path
             *args: Additional positional arguments for the HTTP request
             **kwargs: Additional keyword arguments for the HTTP request
-            
+
         Returns:
             httpx.Response: The HTTP response object
-            
+
         Raises:
             ValueError: If the HTTP method is not valid for httpx.Client
             TypeError: If headers in kwargs is not a valid dict
         """
+        logger.debug("Sending %s request to path: %s", method.upper(), path)
+
         if not hasattr(self.__client__, method):
+            logger.error("Invalid HTTP method '%s' for httpx.Client", method)
             raise ValueError(
                 f"HTTP method '{method}' is not valid method for httpx.Client"
             )
@@ -70,39 +75,52 @@ class Chapa:
             extra_headers = kwargs["headers"]
 
             if not isinstance(extra_headers, dict):
+                logger.error("Invalid headers type provided, must be dict")
                 raise TypeError("headers must be a valid dict")
 
             headers.update(extra_headers)
+            logger.debug("Added extra headers: %s", list(extra_headers.keys()))
 
         method_effector = getattr(self.__client__, method)
         url = f"{self.__base_url__}/{path.lstrip('/')}"
-        response = method_effector(url, headers=headers, *args, **kwargs)
-        return response
+
+        try:
+            logger.debug("Making HTTP request to: %s", url)
+            response = method_effector(url, headers=headers, *args, **kwargs)
+            logger.debug("Response status: %s", response.status_code)
+            return response
+        except Exception as e:
+            logger.error("HTTP request failed: %s", str(e))
+            raise
 
     def _check_response(self, response: httpx.Response, data: dict):
         """
         Check non 2xx response status codes and raise exceptions with error details.
-        
+
         Args:
             response (httpx.Response): The HTTP response object
             data (dict): Response data containing error message
-            
+
         Raises:
             ChapaError: If the response status indicates an error
         """
         if not response.is_success:
-            raise ChapaError(data.get("message", "Unknown error"), response)
+            error_msg = data.get("message", "Unknown error")
+            logger.error(
+                "API request failed with status %s: %s", response.status_code, error_msg
+            )
+            raise ChapaError(error_msg, response)
 
     def _extract_json_data(self, response: httpx.Response) -> dict:
         """
         Extract JSON body and serialize it to Python dict objects.
-        
+
         Args:
             response (httpx.Response): The HTTP response object
-            
+
         Returns:
             dict: The parsed JSON response data
-            
+
         Raises:
             ChapaError: If the response contains invalid JSON or indicates an error
         """
@@ -117,16 +135,17 @@ class Chapa:
     def _check_data_fields(self, data: dict, fields: list[str]):
         """
         Check if response data includes required fields and raise if one is missing.
-        
+
         Args:
             data (dict): The response data to validate
             fields (list[str]): List of required field names
-            
+
         Raises:
             ChapaError: If any required field is missing from the data
         """
         for field in fields:
             if field not in data:
+                logger.error("Missing required field '%s' in response data", field)
                 raise ChapaError(f"data missing {field} field")
 
     def init_payment(
@@ -146,7 +165,7 @@ class Chapa:
     ) -> PaymentCheckout:
         """
         Initialize a payment transaction.
-        
+
         Args:
             amount (int | float): The amount to be charged
             currency (str, optional): The currency for the payment
@@ -164,6 +183,7 @@ class Chapa:
         Returns:
             PaymentCheckout: Object containing checkout URL and other payment details
         """
+        logger.info("Initializing payment for amount: %s", amount)
 
         path = "/transaction/initialize"
         payload: dict = {"amount": str(amount)}
@@ -207,18 +227,20 @@ class Chapa:
         data = json_data.get("data", {})
         self._check_data_fields(data, ["checkout_url"])
 
+        logger.info("Payment initialized successfully with checkout URL")
         return PaymentCheckout(**data)
 
     def verify_transaction(self, tx_ref: str) -> PaymentDetail:
         """
         Verify a payment transaction.
-        
+
         Args:
             tx_ref (str): The transaction reference to verify
-            
+
         Returns:
             PaymentDetail: Object containing detailed payment information
         """
+        logger.info("Verifying transaction with reference: %s", tx_ref)
 
         path = f"/transaction/verify/{tx_ref}"
 
@@ -269,6 +291,7 @@ class Chapa:
         Returns:
             ChapaSubaccount: Object containing subaccount details including subaccount_id
         """
+        logger.info("Creating subaccount for account: %s", account_name)
 
         path = "/subaccount"
 
@@ -294,14 +317,15 @@ class Chapa:
     def get_transactions(self, page: int = 1, per_page: int = 10) -> dict:
         """
         Get a paginated list of transactions.
-        
+
         Args:
             page (int, optional): The page number to retrieve. Defaults to 1
             per_page (int, optional): Number of transactions per page. Defaults to 10
-            
+
         Returns:
             dict: Dictionary containing paginated transaction data
         """
+        logger.debug("Fetching transactions - page: %s, per_page: %s", page, per_page)
         params = {"page": page, "per_page": per_page}
 
         response = self._send_request(
@@ -314,13 +338,14 @@ class Chapa:
     def get_transaction_log(self, tx_ref: str) -> list:
         """
         Get the transaction log for a specific transaction.
-        
+
         Args:
             tx_ref (str): The transaction reference to get logs for
-            
+
         Returns:
             list: List of transaction log entries
         """
+        logger.debug("Fetching transaction log for reference: %s", tx_ref)
         path = f"{ChapaURLEndPoint.events}/{tx_ref}"
         response = self._send_request("get", path)
         json_data = self._extract_json_data(response)
@@ -338,7 +363,7 @@ class Chapa:
     ) -> str | None:
         """
         Initialize a bank transfer.
-        
+
         Args:
             amount (int): The amount to transfer
             account_number (str): The destination account number
@@ -346,10 +371,15 @@ class Chapa:
             currency (str, optional): The currency for the transfer
             account_name (str, optional): The name of the account holder
             reference (str, optional): Unique reference for the transfer
-            
+
         Returns:
             str | None: Transfer data
         """
+        logger.info(
+            "Initializing transfer for amount: %s to account: %s",
+            amount,
+            account_number,
+        )
         payload = {
             "account_number": account_number,
             "amount": amount,
@@ -378,15 +408,16 @@ class Chapa:
     ) -> BulkTransferQueue:
         """
         Initialize bulk transfers.
-        
+
         Args:
             title (str, optional): Title for the bulk transfer
             currency (Currency, optional): Currency for the transfers
             bulk_data (list[dict]): List of transfer data dictionaries
-            
+
         Returns:
             BulkTransferQueue: Object containing bulk transfer queue information
         """
+        logger.info("Initializing bulk transfer with %s transfers", len(bulk_data))
         payload = {}
 
         if title:
@@ -408,13 +439,14 @@ class Chapa:
     def verify_transfer(self, tx_ref: str) -> TransferDetail:
         """
         Verify a transfer transaction.
-        
+
         Args:
             tx_ref (str): The transfer reference to verify
-            
+
         Returns:
             TransferDetail: Object containing detailed transfer information
         """
+        logger.info("Verifying transfer with reference: %s", tx_ref)
         path = f"{ChapaURLEndPoint.transfers_verify}/{tx_ref}"
 
         response = self._send_request("get", path)
@@ -444,14 +476,15 @@ class Chapa:
     def get_transfers(self, page: int = 1, per_page: int = 10) -> dict:
         """
         Get a paginated list of transfers.
-        
+
         Args:
             page (int, optional): The page number to retrieve. Defaults to 1
             per_page (int, optional): Number of transfers per page. Defaults to 10
-            
+
         Returns:
             dict: Dictionary containing paginated transfer data
         """
+        logger.debug("Fetching transfers - page: %s, per_page: %s", page, per_page)
         params = {"page": page, "per_page": per_page}
         response = self._send_request("get", ChapaURLEndPoint.transfers, params=params)
         json_data = self._extract_json_data(response)
@@ -461,10 +494,11 @@ class Chapa:
     def banks(self) -> dict:
         """
         Get a list of supported banks.
-        
+
         Returns:
             dict: Dictionary containing list of available banks
         """
+        logger.debug("Fetching list of supported banks")
         response = self._send_request("get", ChapaURLEndPoint.banks)
         json_data = self._extract_json_data(response)
 
@@ -473,13 +507,17 @@ class Chapa:
     def balances(self, currency: Currency | None = None) -> list:
         """
         Get available balances.
-        
+
         Args:
             currency (Currency, optional): Specific currency to get balance for
-            
+
         Returns:
             list: List of ChapaBalance objects containing balance information
         """
+        logger.debug(
+            "Fetching balances for currency: %s",
+            currency if currency else "all currencies",
+        )
         path = ChapaURLEndPoint.balances
 
         if currency:
@@ -508,15 +546,18 @@ class Chapa:
     ) -> dict:
         """
         Swap currency between different supported currencies.
-        
+
         Args:
             amount (int | float): The amount to swap
             from_currency (Currency): The source currency to swap from
             to_currency (Currency): The target currency to swap to
-            
+
         Returns:
             dict: Dictionary containing swap transaction details
         """
+        logger.info(
+            "Initiating currency swap: %s %s to %s", amount, from_currency, to_currency
+        )
         payload = {
             "amount": amount,
             "from": from_currency,
@@ -530,4 +571,5 @@ class Chapa:
 
     def close(self) -> None:
         """Close http client"""
+        logger.debug("Closing Chapa HTTP client")
         self.__client__.close()
