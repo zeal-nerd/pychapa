@@ -15,7 +15,22 @@ logger = logging.getLogger("pychapa")
 
 
 class Chapa:
+    """
+    Synchronous client for interacting with the Chapa payment API.
+    
+    This client provides methods for payment processing, transfers, subaccounts,
+    and other Chapa API functionality using synchronous HTTP requests.
+    """
+    
     def __init__(self, token: str, base_url: str = "https://api.chapa.co/v1") -> None:
+        """
+        Initialize the Chapa client.
+        
+        Args:
+            token (str): Your Chapa API token for authentication
+            base_url (str, optional): The base URL for the Chapa API. 
+                Defaults to "https://api.chapa.co/v1"
+        """
         self.__token__ = token
         self.__base_url__ = base_url
         self.__client__ = httpx.Client()
@@ -28,7 +43,22 @@ class Chapa:
     def _send_request(
         self, method: HttpMethod, path: str, *args, **kwargs
     ) -> httpx.Response:
-        """Sending all requests from a single point with authorization keys"""
+        """
+        Send all requests from a single point with authorization keys.
+        
+        Args:
+            method (HttpMethod): The HTTP method to use
+            path (str): The API endpoint path
+            *args: Additional positional arguments for the HTTP request
+            **kwargs: Additional keyword arguments for the HTTP request
+            
+        Returns:
+            httpx.Response: The HTTP response object
+            
+        Raises:
+            ValueError: If the HTTP method is not valid for httpx.Client
+            TypeError: If headers in kwargs is not a valid dict
+        """
         if not hasattr(self.__client__, method):
             raise ValueError(
                 f"HTTP method '{method}' is not valid method for httpx.Client"
@@ -50,12 +80,32 @@ class Chapa:
         return response
 
     def _check_response(self, response: httpx.Response, data: dict):
-        """Checking non 2xx response status codes and raising exceptions with error details"""
+        """
+        Check non 2xx response status codes and raise exceptions with error details.
+        
+        Args:
+            response (httpx.Response): The HTTP response object
+            data (dict): Response data containing error message
+            
+        Raises:
+            ChapaError: If the response status indicates an error
+        """
         if not response.is_success:
             raise ChapaError(data.get("message", "Unknown error"), response)
 
     def _extract_json_data(self, response: httpx.Response) -> dict:
-        """Extracting json body and serilizing them to python dict objects"""
+        """
+        Extract JSON body and serialize it to Python dict objects.
+        
+        Args:
+            response (httpx.Response): The HTTP response object
+            
+        Returns:
+            dict: The parsed JSON response data
+            
+        Raises:
+            ChapaError: If the response contains invalid JSON or indicates an error
+        """
         try:
             data = response.json()
         except httpx.DecodingError:
@@ -65,7 +115,16 @@ class Chapa:
         return data
 
     def _check_data_fields(self, data: dict, fields: list[str]):
-        """Checking if a response data includes required fields and raising if one is missing"""
+        """
+        Check if response data includes required fields and raise if one is missing.
+        
+        Args:
+            data (dict): The response data to validate
+            fields (list[str]): List of required field names
+            
+        Raises:
+            ChapaError: If any required field is missing from the data
+        """
         for field in fields:
             if field not in data:
                 raise ChapaError(f"data missing {field} field")
@@ -86,14 +145,24 @@ class Chapa:
         meta: dict | None = None,
     ) -> PaymentCheckout:
         """
-        Initializes a payment
+        Initialize a payment transaction.
+        
         Args:
-            amount (int): The amount to be charged
-            currency (str):
+            amount (int | float): The amount to be charged
+            currency (str, optional): The currency for the payment
+            first_name (str, optional): Customer's first name
+            last_name (str, optional): Customer's last name
+            phone_number (str, optional): Customer's phone number
+            email (str, optional): Customer's email address
+            callback_url (str, optional): URL to redirect after payment
+            return_url (str, optional): URL to return to after payment
+            customization (dict, optional): Payment form customization options
+            subaccount_id (str, optional): ID of the subaccount to use
+            tx_ref (str, optional): Unique transaction reference
+            meta (dict, optional): Additional metadata for the transaction
 
         Returns:
-            (dict): A dictionary containing checkout url
-
+            PaymentCheckout: Object containing checkout URL and other payment details
         """
 
         path = "/transaction/initialize"
@@ -141,7 +210,15 @@ class Chapa:
         return PaymentCheckout(**data)
 
     def verify_transaction(self, tx_ref: str) -> PaymentDetail:
-        """Verifing transactions"""
+        """
+        Verify a payment transaction.
+        
+        Args:
+            tx_ref (str): The transaction reference to verify
+            
+        Returns:
+            PaymentDetail: Object containing detailed payment information
+        """
 
         path = f"/transaction/verify/{tx_ref}"
 
@@ -179,14 +256,18 @@ class Chapa:
         business_name: str | None = None,
     ) -> ChapaSubaccount:
         """
-        Creates a subaccount.
+        Create a subaccount for payment splitting.
 
         Args:
-            amount (int): The amount to be charged
-            currency (str):
+            account_name (str): The name of the account holder
+            bank_code (int): The bank code for the account
+            account_number (str): The account number
+            split_value (int | float): The value to split (amount or percentage)
+            split_type (SplitType): The type of split (percentage or flat)
+            business_name (str, optional): The name of the business
 
         Returns:
-            dict: containing subaccount_id
+            ChapaSubaccount: Object containing subaccount details including subaccount_id
         """
 
         path = "/subaccount"
@@ -211,7 +292,16 @@ class Chapa:
         return ChapaSubaccount(**data)
 
     def get_transactions(self, page: int = 1, per_page: int = 10) -> dict:
-        """Fetching paginated list of transactions made"""
+        """
+        Get a paginated list of transactions.
+        
+        Args:
+            page (int, optional): The page number to retrieve. Defaults to 1
+            per_page (int, optional): Number of transactions per page. Defaults to 10
+            
+        Returns:
+            dict: Dictionary containing paginated transaction data
+        """
         params = {"page": page, "per_page": per_page}
 
         response = self._send_request(
@@ -222,7 +312,15 @@ class Chapa:
         return json_data.get("data", {})
 
     def get_transaction_log(self, tx_ref: str) -> list:
-        """Fetching a transaction log"""
+        """
+        Get the transaction log for a specific transaction.
+        
+        Args:
+            tx_ref (str): The transaction reference to get logs for
+            
+        Returns:
+            list: List of transaction log entries
+        """
         path = f"{ChapaURLEndPoint.events}/{tx_ref}"
         response = self._send_request("get", path)
         json_data = self._extract_json_data(response)
@@ -238,7 +336,20 @@ class Chapa:
         account_name: str | None = None,
         reference: str | None = None,
     ) -> str | None:
-        """Initializing bank transfers"""
+        """
+        Initialize a bank transfer.
+        
+        Args:
+            amount (int): The amount to transfer
+            account_number (str): The destination account number
+            bank_code (int): The bank code for the destination bank
+            currency (str, optional): The currency for the transfer
+            account_name (str, optional): The name of the account holder
+            reference (str, optional): Unique reference for the transfer
+            
+        Returns:
+            str | None: Transfer data
+        """
         payload = {
             "account_number": account_number,
             "amount": amount,
@@ -265,7 +376,17 @@ class Chapa:
         currency: Currency | None,
         bulk_data: list[dict],
     ) -> BulkTransferQueue:
-        """Init bulk transfers"""
+        """
+        Initialize bulk transfers.
+        
+        Args:
+            title (str, optional): Title for the bulk transfer
+            currency (Currency, optional): Currency for the transfers
+            bulk_data (list[dict]): List of transfer data dictionaries
+            
+        Returns:
+            BulkTransferQueue: Object containing bulk transfer queue information
+        """
         payload = {}
 
         if title:
@@ -285,7 +406,15 @@ class Chapa:
         return BulkTransferQueue(**data)
 
     def verify_transfer(self, tx_ref: str) -> TransferDetail:
-        """Verify transfer"""
+        """
+        Verify a transfer transaction.
+        
+        Args:
+            tx_ref (str): The transfer reference to verify
+            
+        Returns:
+            TransferDetail: Object containing detailed transfer information
+        """
         path = f"{ChapaURLEndPoint.transfers_verify}/{tx_ref}"
 
         response = self._send_request("get", path)
@@ -313,7 +442,16 @@ class Chapa:
         return TransferDetail(**data)
 
     def get_transfers(self, page: int = 1, per_page: int = 10) -> dict:
-        """Get paginated list of transfers"""
+        """
+        Get a paginated list of transfers.
+        
+        Args:
+            page (int, optional): The page number to retrieve. Defaults to 1
+            per_page (int, optional): Number of transfers per page. Defaults to 10
+            
+        Returns:
+            dict: Dictionary containing paginated transfer data
+        """
         params = {"page": page, "per_page": per_page}
         response = self._send_request("get", ChapaURLEndPoint.transfers, params=params)
         json_data = self._extract_json_data(response)
@@ -321,14 +459,27 @@ class Chapa:
         return json_data.get("data", {})
 
     def banks(self) -> dict:
-        """Get a list of banks"""
+        """
+        Get a list of supported banks.
+        
+        Returns:
+            dict: Dictionary containing list of available banks
+        """
         response = self._send_request("get", ChapaURLEndPoint.banks)
         json_data = self._extract_json_data(response)
 
         return json_data
 
     def balances(self, currency: Currency | None = None) -> list:
-        """Get available balances"""
+        """
+        Get available balances.
+        
+        Args:
+            currency (Currency, optional): Specific currency to get balance for
+            
+        Returns:
+            list: List of ChapaBalance objects containing balance information
+        """
         path = ChapaURLEndPoint.balances
 
         if currency:
@@ -355,7 +506,17 @@ class Chapa:
     def swap(
         self, amount: int | float, from_currency: Currency, to_currency: Currency
     ) -> dict:
-        """Swap currency"""
+        """
+        Swap currency between different supported currencies.
+        
+        Args:
+            amount (int | float): The amount to swap
+            from_currency (Currency): The source currency to swap from
+            to_currency (Currency): The target currency to swap to
+            
+        Returns:
+            dict: Dictionary containing swap transaction details
+        """
         payload = {
             "amount": amount,
             "from": from_currency,
