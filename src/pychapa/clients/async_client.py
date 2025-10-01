@@ -1,6 +1,6 @@
 import httpx
 import logging
-from .schema import (
+from ..schema import (
     BulkTransferQueue,
     ChapaBalance,
     ChapaSubaccount,
@@ -185,7 +185,6 @@ class AsyncChapa:
         """
         logger.info("Initializing payment for amount: %s", amount)
 
-        path = "/transaction/initialize"
         payload: dict = {"amount": str(amount)}
 
         if currency:
@@ -221,7 +220,9 @@ class AsyncChapa:
         if meta:
             payload["meta"] = meta
 
-        response = await self._send_request("post", path, json=payload)
+        response = await self._send_request(
+            "post", ChapaURLEndPoint.transaction_initialize, json=payload
+        )
 
         json_data = self._extract_json_data(response)
         data = json_data.get("data", {})
@@ -242,7 +243,7 @@ class AsyncChapa:
         """
         logger.info("Verifying transaction with reference: %s", tx_ref)
 
-        path = f"/transaction/verify/{tx_ref}"
+        path = f"{ChapaURLEndPoint.transaction_verify}/{tx_ref}"
 
         response = await self._send_request("get", path)
         json_data = self._extract_json_data(response)
@@ -293,8 +294,6 @@ class AsyncChapa:
         """
         logger.info("Creating subaccount for account: %s", account_name)
 
-        path = "/subaccount"
-
         payload = {
             "account_name": account_name,
             "bank_code": bank_code,
@@ -306,7 +305,9 @@ class AsyncChapa:
         if business_name:
             payload["business_name"] = business_name
 
-        response = await self._send_request("post", path, json=payload)
+        response = await self._send_request(
+            "post", ChapaURLEndPoint.subaccount, json=payload
+        )
         json_data = self._extract_json_data(response)
 
         data = json_data.get("data", {})
