@@ -2,9 +2,10 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from typing import Optional
-from .utils import Currency, Mode, Status
+from .types import CurrencyLiteral, ModeLiteral, StatusLiteral
 
 
+# ----------------------- Chapa Client Schemas
 class ChapaBalance(BaseModel):
     currency: str
     available_balance: float
@@ -31,8 +32,8 @@ class PaymentDetail(BaseModel):
     email: Optional[str] = None
     amount: float
     charge: Optional[float] = None
-    currency: Currency
-    mode: Mode
+    currency: CurrencyLiteral
+    mode: ModeLiteral
     status: str
     method: Optional[str] = None
     type: str
@@ -50,9 +51,9 @@ class TransferDetail(BaseModel):
     mobile: Optional[str] = None
     amount: float
     charge: float
-    currency: Currency
-    mode: Mode
-    status: Status
+    currency: CurrencyLiteral
+    mode: ModeLiteral
+    status: StatusLiteral
     bank_code: str
     bank_name: str
     transfer_method: str
@@ -68,3 +69,43 @@ class TransferDetail(BaseModel):
 class BulkTransferQueue(BaseModel):
     id: int
     created_at: datetime
+
+
+# -------------------- Chapa Webhook Schemas
+class TransactionEvent:
+    first_name: Optional[str]
+    last_name: Optional[str]
+    email: Optional[str]
+    mobile: Optional[str]
+    currency: CurrencyLiteral
+    payment_method: str
+    amount: float
+    charge: float
+    event: str
+    status: str
+    type: str
+    mode: ModeLiteral
+    tx_ref: str
+    reference: str
+    customization: ChapaCustomization
+    meta: Optional[str]
+    created_at: str
+    updated_at: str
+
+
+class TransferEvent:
+    account_name: str
+    account_number: str
+    bank_reference: str
+    bank_id: int
+    bank_name: str
+    amount: float
+    currency: CurrencyLiteral
+    charge: float
+    event: str
+    status: str
+    type: str
+    reference: str
+    chapa_reference: str
+    created_at: datetime
+    updated_at: datetime

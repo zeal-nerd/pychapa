@@ -1,13 +1,3 @@
-from typing import Literal
-
-# --------------- Types
-Mode = Literal["test", "live"]
-Status = Literal["pending", "success"]
-Currency = Literal["ETB", "USD"]
-HttpMethod = Literal["get", "post"]
-SplitType = Literal["flat", "percentage"]
-
-
 # ---------------- Endpoints
 class ChapaURLEndPoint:
     swap = "swap"
