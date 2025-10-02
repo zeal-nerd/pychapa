@@ -1,1 +1,1 @@
-## Asynchrnous Chapa Python Client(SDK)
+## Chapa SDK for python programming language.
