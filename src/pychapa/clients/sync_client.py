@@ -8,9 +8,8 @@ from ..schema import (
     PaymentDetail,
     TransferDetail,
 )
-from ..utils import ChapaURLEndPoint
+from ..utils import HttpMethod, Currency, SplitType, ChapaURLEndPoint
 from ..exception import ChapaError
-from ..types import HttpMethodLiteral, CurrencyLiteral, SplitTypeLiteral
 
 logger = logging.getLogger("pychapa")
 
@@ -44,7 +43,7 @@ class Chapa:
         logger.debug("Chapa client initialized successfully")
 
     def _send_request(
-        self, method: HttpMethodLiteral, path: str, *args, **kwargs
+        self, method: HttpMethod, path: str, *args, **kwargs
     ) -> httpx.Response:
         """
         Send all requests from a single point with authorization keys.
@@ -276,7 +275,7 @@ class Chapa:
         bank_code: int,
         account_number: str,
         split_value: int | float,
-        split_type: SplitTypeLiteral,
+        split_type: SplitType,
         business_name: str | None = None,
     ) -> ChapaSubaccount:
         """
@@ -294,6 +293,7 @@ class Chapa:
             ChapaSubaccount: Object containing subaccount details including subaccount_id
         """
         logger.info("Creating subaccount for account: %s", account_name)
+
 
         payload = {
             "account_name": account_name,
@@ -403,7 +403,7 @@ class Chapa:
     def bulk_transfer(
         self,
         title: str | None,
-        currency: CurrencyLiteral | None,
+        currency: Currency | None,
         bulk_data: list[dict],
     ) -> BulkTransferQueue:
         """
@@ -504,7 +504,7 @@ class Chapa:
 
         return json_data
 
-    def balances(self, currency: CurrencyLiteral | None = None) -> list:
+    def balances(self, currency: Currency | None = None) -> list:
         """
         Get available balances.
 
@@ -542,10 +542,7 @@ class Chapa:
         return data
 
     def swap(
-        self,
-        amount: int | float,
-        from_currency: CurrencyLiteral,
-        to_currency: CurrencyLiteral,
+        self, amount: int | float, from_currency: Currency, to_currency: Currency
     ) -> dict:
         """
         Swap currency between different supported currencies.

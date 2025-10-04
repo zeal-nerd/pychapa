@@ -8,9 +8,8 @@ from ..schema import (
     PaymentDetail,
     TransferDetail,
 )
-from ..utils import ChapaURLEndPoint
+from ..utils import HttpMethod, Currency, SplitType, ChapaURLEndPoint
 from ..exception import ChapaError
-from ..types import HttpMethodLiteral, CurrencyLiteral, SplitTypeLiteral
 
 logger = logging.getLogger("pychapa")
 
@@ -44,7 +43,7 @@ class AsyncChapa:
         logger.debug("Chapa async client initialized successfully")
 
     async def _send_request(
-        self, method: HttpMethodLiteral, path: str, *args, **kwargs
+        self, method: HttpMethod, path: str, *args, **kwargs
     ) -> httpx.Response:
         """
         Send all requests from a single point with authorization keys.
@@ -276,7 +275,7 @@ class AsyncChapa:
         bank_code: int,
         account_number: str,
         split_value: int | float,
-        split_type: SplitTypeLiteral,
+        split_type: SplitType,
         business_name: str | None = None,
     ) -> ChapaSubaccount:
         """
@@ -407,7 +406,7 @@ class AsyncChapa:
     async def bulk_transfer(
         self,
         title: str | None,
-        currency: CurrencyLiteral | None,
+        currency: Currency | None,
         bulk_data: list[dict],
     ) -> BulkTransferQueue:
         """
@@ -510,7 +509,7 @@ class AsyncChapa:
 
         return json_data
 
-    async def balances(self, currency: CurrencyLiteral | None = None) -> list:
+    async def balances(self, currency: Currency | None = None) -> list:
         """
         Get available balances.
 
@@ -548,10 +547,7 @@ class AsyncChapa:
         return data
 
     async def swap(
-        self,
-        amount: int | float,
-        from_currency: CurrencyLiteral,
-        to_currency: CurrencyLiteral,
+        self, amount: int | float, from_currency: Currency, to_currency: Currency
     ) -> dict:
         """
         Swap currency between different supported currencies.
